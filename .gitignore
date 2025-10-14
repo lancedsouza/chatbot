@@ -48,3 +48,4 @@ node_modules/
 *.bak
 *.tmp
 backend/client_secret_*.json
+backend/client_secret_*.json

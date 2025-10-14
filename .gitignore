@@ -47,3 +47,4 @@ node_modules/
 # System files
 *.bak
 *.tmp
+backend/client_secret_*.json

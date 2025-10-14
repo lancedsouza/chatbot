@@ -1,0 +1,15 @@
+langchain
+langchain-community
+langchain-huggingface
+langchain-ollama
+langgraph
+sentence-transformers
+faiss-cpu
+ollama
+flask
+flask-cors
+pypdf
+google-auth-oauthlib
+google-api-python-client
+google-auth-httplib2
+

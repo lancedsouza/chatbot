@@ -1,0 +1,166 @@
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <title>PDF Voice QA</title>
+  </head>
+  <body>
+    <h2>🎤 Ask Your Stock PDF a Question</h2>
+    <button onclick="startListening()">🎙️ Speak</button>
+    <p><strong>You asked:</strong> <span id="question"></span></p>
+    <p><strong>Answer:</strong> <span id="answer"></span></p>
+
+    <script>
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+
+      function startListening() {
+        recognition.start();
+      }
+
+      recognition.onresult = async function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('question').textContent = transcript;
+
+  const response = await fetch('/ask', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ question: transcript })
+});
+
+
+
+
+
+
+
+
+        const data = await response.json();
+        const answer = data.answer;
+        document.getElementById('answer').textContent = answer;
+
+        const utterance = new SpeechSynthesisUtterance(answer);
+        speechSynthesis.speak(utterance);
+      };
+    </script>
+  </body>
+</html> -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PDF QA & Booking Chatbot</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    #chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: auto; }
+    .user { color: blue; margin: 5px 0; }
+    .bot { color: green; margin: 5px 0; }
+    input[type="text"] { width: 80%; padding: 10px; }
+    button { padding: 10px; }
+  </style>
+</head>
+<body>
+
+<h2>PDF QA & Booking Chatbot</h2>
+<div id="chat"></div>
+
+<input type="text" id="question" placeholder="Ask a question or book an appointment..." />
+<button onclick="sendMessage()">Send</button>
+
+<script>
+let pendingBookingFields = [];
+let bookingData = {};
+
+function appendMessage(role, text) {
+  const chat = document.getElementById('chat');
+  const msg = document.createElement('div');
+  msg.className = role;
+  msg.textContent = `${role === 'user' ? 'You' : 'Bot'}: ${text}`;
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// Send user message to backend and handle response
+function sendMessage() {
+  const input = document.getElementById('question');
+  let question = input.value.trim();
+  if (!question) return;
+
+  appendMessage('user', question);
+  input.value = '';
+
+  if (pendingBookingFields.length > 0) {
+    // We are collecting booking fields from user
+    const field = pendingBookingFields.shift();
+    bookingData[field] = question;
+
+    if (pendingBookingFields.length === 0) {
+      // All fields collected - send booking data once
+      fetch('/book_appointment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bookingData)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          appendMessage('bot', `Error: ${data.error}`);
+          // If error, maybe restart booking process or clear bookingData
+          bookingData = {};
+        } else {
+          appendMessage('bot', data.message || 'Appointment booked!');
+          bookingData = {};
+        }
+      })
+      .catch(err => {
+        appendMessage('bot', 'Error contacting server.');
+        console.error(err);
+        bookingData = {};
+      });
+    } else {
+      // Ask next missing field
+      appendMessage('bot', `Please provide your ${pendingBookingFields[0]}`);
+    }
+
+  } else {
+    // Normal chat Q&A
+    fetch('/agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: question })  // backend expects "message"
+    })
+    .then(res => res.json())
+    .then(data => {
+      const answer = data.answer || data.message || 'No response';
+
+      // If answer is an object (like LangChain output), try to extract text
+      let textAnswer = '';
+      if (typeof answer === 'string') {
+        textAnswer = answer;
+      } else if (typeof answer === 'object') {
+        // Try common keys
+        if (answer.output) textAnswer = answer.output;
+        else textAnswer = JSON.stringify(answer);
+      } else {
+        textAnswer = String(answer);
+      }
+
+      appendMessage('bot', textAnswer);
+
+      // Check if bot asks for missing booking info
+      if (textAnswer.startsWith("Please provide the following missing information:")) {
+        const missing = textAnswer.split(':')[1].split(',').map(s => s.trim());
+        pendingBookingFields = missing;
+        bookingData = {};
+        appendMessage('bot', `Please provide your ${pendingBookingFields[0]}`);
+      }
+    })
+    .catch(err => {
+      appendMessage('bot', 'Error contacting server.');
+      console.error(err);
+    });
+  }
+}
+</script>
+
+</body>
+</html>

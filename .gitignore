@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.env
+.venv/
+venv/
+env/
+
+# Pip & Poetry files
+pip-log.txt
+poetry.lock
+
+# FAISS index files
+backend/faiss_index/
+faiss_index/
+
+# PDF uploads (optional)
+backend/pdfs/
+pdfs/
+
+# Docker
+*.log
+*.pid
+*.seed
+*.pid.lock
+docker-compose.override.yml
+
+# VSCode & IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Frontend build artifacts (if using a build system)
+frontend/dist/
+frontend/build/
+node_modules/
+
+# System files
+*.bak
+*.tmp

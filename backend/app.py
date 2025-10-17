@@ -1,6 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import json
+import os
 
 # LangChain agent and tools
 from langchain.agents import initialize_agent, Tool
@@ -13,11 +14,23 @@ from pdf_qa_bot import rag_answer, llm  # reusing your PDF RAG logic and LLM
 app = Flask(__name__)
 CORS(app)
 
-# 📅 Google Calendar Tool
+# 📅 Google Calendar Tool with safer handler
+def calendar_tool_handler(input_str):
+    try:
+        data = json.loads(input_str)
+        return create_event(
+            name=data.get("name", ""),
+            date_str=data.get("date", ""),
+            time_str=data.get("time", ""),
+            purpose=data.get("purpose", "")
+        )
+    except Exception as e:
+        return f"❌ Failed to parse or create event: {str(e)}"
+
 calendar_tool = Tool(
     name="Google Calendar Tool",
-    func=lambda x: create_event(**json.loads(x)),
-    description="Use this to create calendar events. Input should be JSON with keys: name, date, time, purpose."
+    func=calendar_tool_handler,
+    description="Use this to create calendar events. Input must be JSON with keys: name, date, time, purpose."
 )
 
 # 📄 PDF Q&A Tool
@@ -27,7 +40,7 @@ pdf_qa_tool = Tool(
     description="Use this to answer questions based on uploaded PDF documents."
 )
 
-# 🧠 LangChain Agent with both tools
+# 🧠 LangChain Agent
 agent = initialize_agent(
     tools=[calendar_tool, pdf_qa_tool],
     llm=llm,
@@ -39,25 +52,22 @@ agent = initialize_agent(
 def home():
     return jsonify({"message": "Backend is running!"})
 
-
-# ✅ Homepage route
 @app.route("/agent", methods=["POST"])
 def run_agent():
     data = request.get_json()
-    message = data.get("message", "")
-    print(f"Received message: {message}")  # debug log
+    message = data.get("message", "").strip()
+    print(f"Received message: {message}")
 
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
     try:
         response = agent.invoke(message)
-        print(f"Agent response: {response}")  # debug log
+        print(f"Agent response: {response}")
 
-        # Extract string output from response
-        answer_text = ""
-        if isinstance(response, dict) and "output" in response:
-            answer_text = response["output"]
+        # Cleanly extract output
+        if isinstance(response, dict):
+            answer_text = response.get("output") or response.get("result") or str(response)
         elif hasattr(response, "output"):
             answer_text = response.output
         else:
@@ -65,10 +75,13 @@ def run_agent():
 
         return jsonify({"answer": answer_text})
     except Exception as e:
-        print(f"Agent error: {str(e)}")  # debug log
-        return jsonify({"error": str(e)}), 500
+        print(f"Agent error: {str(e)}")
+        return jsonify({"error": f"Agent failed: {str(e)}"}), 500
 
-# (Optional) 🔧 Manual fallback route (still uses create_event)
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, ''), 'favicon.ico')
+
 @app.route("/book_appointment", methods=["POST"])
 def book_appointment():
     data = request.get_json()
@@ -78,16 +91,15 @@ def book_appointment():
     purpose = data.get("purpose")
 
     if not all([name, date, time, purpose]):
-        return jsonify({"error": "Missing information"}), 400
+        return jsonify({"error": "Missing one or more required fields."}), 400
 
     try:
         calendar_link = create_event(name, date, time, purpose)
         return jsonify({
-            "message": f"Appointment booked for {name} on {date} at {time} for {purpose}.",
+            "message": f"✅ Appointment booked for {name} on {date} at {time} for {purpose}.",
             "calendar_link": calendar_link
         })
     except Exception as e:
-        # 🔥 Print error for debugging
         print("Error in create_event:", e)
         return jsonify({"error": f"create_event failed: {str(e)}"}), 500
 

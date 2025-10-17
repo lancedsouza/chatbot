@@ -1,27 +1,25 @@
 # Use an official NVIDIA CUDA runtime base image
 FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
-# Install Python 3.10, pip and other necessary libs
+# Install Python 3.10 and dependencies
 RUN apt-get update && apt-get install -y \
-    python3.10 python3-pip python3-venv \
+    python3.10 python3.10-venv python3-pip \
     libgl1-mesa-glx libomp-dev build-essential \
+    && ln -sf python3.10 /usr/bin/python \
+    && ln -sf pip3 /usr/bin/pip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy requirements first to cache this step if unchanged
+# Copy and install Python dependencies
 COPY requirements.txt .
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt
 
-# Upgrade pip and install dependencies
-RUN pip3 install --upgrade pip setuptools wheel && \
-    pip3 install -r requirements.txt
-
-# Copy the rest of your app code
+# Copy the application code
 COPY . .
 
-# Expose the port your app will run on
 EXPOSE 8000
 
-# Command to run your app
-CMD ["python3", "app.py"]
-
+# Start the Flask app
+CMD ["python", "app.py"]

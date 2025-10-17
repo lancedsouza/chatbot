@@ -2,8 +2,10 @@ __pycache__
 *.pyc
 *.pyo
 *.pyd
-.env
+env
+venv
 .git
 .gitignore
-faiss_index/
-backend/pdfs/
+Dockerfile
+docker-compose.yml
+*.md
